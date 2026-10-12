@@ -26,6 +26,12 @@ jobs:
           server-username: ANYPOINT_MAVEN_USERNAME
           server-password: ANYPOINT_MAVEN_PASSWORD
 
+      - name: Verify resource before Maven
+        shell: bash
+        run: |
+          ls -la src/main/resources/properties/
+          test -f src/main/resources/properties/secure.yaml
+
       - name: Set up Maven 3.9.9
         uses: stCarolas/setup-maven@v5
         with:
@@ -45,6 +51,15 @@ jobs:
       - name: Validate secure YAML
         run: |
           ruby -e 'require "yaml"; data = YAML.load_file("src/main/resources/properties/secure.yaml"); abort "Invalid secure YAML mapping" unless data.is_a?(Hash); puts "Secure YAML syntax is valid"'
+
+      - name: Verify secure YAML resource
+        shell: bash
+        run: |
+          test -s src/main/resources/properties/secure.yaml || {
+            echo "ERROR: secure.yaml is missing or empty"
+            exit 1
+          }
+          echo "Secure YAML file exists"
 
       - name: Build Mule application
         run: mvn -B clean verify -Dsecure.key="$MULE_SECURE_KEY" -Dmunit.failIfNoTests=false
