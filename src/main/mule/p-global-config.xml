@@ -52,7 +52,7 @@ http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/sc
     <configuration
         doc:name="Global Configuration"
         defaultErrorHandler-ref="PAPI_Global_Error_Handler"/>
-	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="824dcf15-e2c2-49d2-89d8-6d56bf26583d" file="properties\secure.yaml" key="${s.key}" >
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="824dcf15-e2c2-49d2-89d8-6d56bf26583d" file="properties\secure.yaml" key="${secure.key}" >
 		<secure-properties:encrypt algorithm="Blowfish" />
 	</secure-properties:config>
 	

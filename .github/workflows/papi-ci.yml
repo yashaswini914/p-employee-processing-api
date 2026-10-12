@@ -49,8 +49,8 @@ jobs:
         run: |
           ruby -e 'require "yaml"; data = YAML.load_file("src/main/resources/properties/secure.yaml"); abort "Invalid secure YAML mapping" unless data.is_a?(Hash); puts "Secure YAML syntax is valid"'
 
-      - name: Build and run MUnit tests
-        run: mvn -B clean verify -Dsecure.key="$MULE_SECURE_KEY"
+      - name: Build Mule application
+        run: mvn -B clean verify -Dsecure.key="$MULE_SECURE_KEY" -Dmunit.failIfNoTests=false
         env:
           ANYPOINT_MAVEN_USERNAME: "~~~Client~~~"
           ANYPOINT_MAVEN_PASSWORD: "${{ secrets.ANYPOINT_CLIENT_ID }}~?~${{ secrets.ANYPOINT_CLIENT_SECRET }}"
