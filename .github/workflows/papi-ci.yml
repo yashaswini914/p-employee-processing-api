@@ -26,12 +26,6 @@ jobs:
           server-username: ANYPOINT_MAVEN_USERNAME
           server-password: ANYPOINT_MAVEN_PASSWORD
 
-      - name: Verify resource before Maven
-        shell: bash
-        run: |
-          ls -la src/main/resources/properties/
-          test -f src/main/resources/properties/secure.yaml
-
       - name: Set up Maven 3.9.9
         uses: stCarolas/setup-maven@v5
         with:
@@ -40,17 +34,24 @@ jobs:
       - name: Check Maven version
         run: mvn -version
 
-      - name: Build and run MUnit tests
-        run: mvn -B clean verify -Dsecure.key="$MULE_SECURE_KEY"
+      - name: Restore secure.yaml
+        shell: bash
         env:
-          ANYPOINT_MAVEN_USERNAME: "~~~Client~~~"
-          ANYPOINT_MAVEN_PASSWORD: "${{ secrets.ANYPOINT_CLIENT_ID }}~?~${{ secrets.ANYPOINT_CLIENT_SECRET }}"
-          MULE_SECURE_KEY: ${{ secrets.MULE_SECURE_KEY }}
-          MAVEN_OPTS: -Xmx2048m
-
-      - name: Validate secure YAML
+          MULE_SECURE_YAML: ${{ secrets.MULE_SECURE_YAML }}
         run: |
-          ruby -e 'require "yaml"; data = YAML.load_file("src/main/resources/properties/secure.yaml"); abort "Invalid secure YAML mapping" unless data.is_a?(Hash); puts "Secure YAML syntax is valid"'
+          mkdir -p src/main/resources/properties
+
+          if [ -z "$MULE_SECURE_YAML" ]; then
+            echo "ERROR: MULE_SECURE_YAML secret is missing or empty"
+            exit 1
+          fi
+
+          printf '%s\n' "$MULE_SECURE_YAML" \
+            > src/main/resources/properties/secure.yaml
+
+          chmod 600 src/main/resources/properties/secure.yaml
+
+          echo "secure.yaml restored successfully"
 
       - name: Verify secure YAML resource
         shell: bash
@@ -59,12 +60,43 @@ jobs:
             echo "ERROR: secure.yaml is missing or empty"
             exit 1
           }
+
           echo "Secure YAML file exists"
 
-      - name: Build Mule application
-        run: mvn -B clean verify -Dsecure.key="$MULE_SECURE_KEY" -Dmunit.failIfNoTests=false
+      - name: Validate secure YAML
+        shell: bash
+        run: |
+          ruby -e '
+            require "yaml"
+            path = "src/main/resources/properties/secure.yaml"
+            data = YAML.load_file(path)
+            abort "Invalid secure YAML mapping" unless data.is_a?(Hash)
+            puts "Secure YAML syntax is valid"
+          '
+
+      - name: Build and run MUnit tests
+        shell: bash
         env:
           ANYPOINT_MAVEN_USERNAME: "~~~Client~~~"
           ANYPOINT_MAVEN_PASSWORD: "${{ secrets.ANYPOINT_CLIENT_ID }}~?~${{ secrets.ANYPOINT_CLIENT_SECRET }}"
           MULE_SECURE_KEY: ${{ secrets.MULE_SECURE_KEY }}
           MAVEN_OPTS: -Xmx2048m
+        run: |
+          if [ -z "$MULE_SECURE_KEY" ]; then
+            echo "ERROR: MULE_SECURE_KEY secret is missing"
+            exit 1
+          fi
+
+          mvn -B clean verify \
+            -Dsecure.key="$MULE_SECURE_KEY"
+
+      - name: Upload MUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: papi-munit-reports
+          path: |
+            target/surefire-reports/
+            target/munit-reports/
+            target/site/munit/
+          if-no-files-found: ignore
