@@ -31,10 +31,10 @@ jobs:
         with:
           maven-version: '3.9.9'
 
-      - name: Check Maven version
+            - name: Check Maven version
         run: mvn -version
 
-            - name: Restore secure properties file
+      - name: Restore secure properties file
         env:
           MULE_SECURE_YAML: ${{ secrets.MULE_SECURE_YAML }}
         run: |
