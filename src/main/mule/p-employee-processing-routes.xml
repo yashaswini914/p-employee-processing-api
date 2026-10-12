@@ -4,25 +4,25 @@
 	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
-	<flow name="get:\employees:p-order-processing-apiraml-config" doc:id="0c061fdd-ddb5-4fc3-aefd-4e3f81da0728" >
-		<logger level="INFO" doc:name="Log Get All Employees Start" doc:id="9c961343-5480-4362-83a7-5f96c724e22f" message="Get all employees request started" />
-		<http:request method="GET" doc:name="Get All Employees From System API" doc:id="49943971-0583-4921-8506-70cd2233f0ac" config-ref="employee-system-api-http-request-config" path="/api/employees" />
-		<logger level="INFO" doc:name="Log Get All Employees End" doc:id="70564fb0-cfd8-41d4-b602-e2aeef26b392" message="Get all employees request completed" />
+	<flow name="get:\employees:p-order-processing-apiraml-config" doc:id="5c4289aa-b640-4473-a243-8ea0193088ac" >
+		<logger level="INFO" doc:name="Log Get All Employees Start" doc:id="d6c743e8-6c0a-4516-b505-27a9ad4498a4" message="Get all employees request started" />
+		<http:request method="GET" doc:name="Get All Employees From System API" doc:id="e8424acf-785b-4d72-b632-ed9fb2d123b3" config-ref="employee-system-api-http-request-config" path="/api/employees" />
+		<logger level="INFO" doc:name="Log Get All Employees End" doc:id="dd1127d6-2204-4f37-a05d-3e621b9db8b2" message="Get all employees request completed" />
 	</flow>
-	<flow name="post:\orders:application\json:p-order-processing-apiraml-config" doc:id="426811a8-caaf-4c96-aa05-9bdf5a1c6778" >
-		<logger level="INFO" doc:name="Log Create Order Request Start" doc:id="c2e11eeb-4b6b-409a-ab92-d473a73bc511" message="Create order request started" />
-		<set-variable value="#[payload]" doc:name="Store Order Request Payload" doc:id="e5e085cd-6dfa-42d0-bb25-726da62333f4" variableName="orderRequestPayload" />
+	<flow name="post:\orders:application\json:p-order-processing-apiraml-config" doc:id="46a47f29-d77f-443a-bb86-b8d6c7876ce5" >
+		<logger level="INFO" doc:name="Log Create Order Request Start" doc:id="ffa5853d-a83c-49ed-8301-94c715fface0" message="Create order request started" />
+		<set-variable value="#[payload]" doc:name="Store Order Request Payload" doc:id="3b5fc960-f7d2-40f7-8bc6-3fff5305c919" variableName="orderRequestPayload" />
 <flow-ref
     doc:name="Validate Business Rules Before Queue"
     name="validate-business-rules-before-queue-flow"/>
-		<flow-ref doc:name="Validate Order Request" doc:id="8d802e86-920f-4614-9505-39390f295957" name="validate-order-request-flow" />
-		<flow-ref doc:name="Publish Order To Queue" doc:id="8bcb2abc-7412-4f5d-b108-530d7a79a218" name="publish-order-to-queue-flow" />
-		<flow-ref doc:name="Build Order Accepted Response" doc:id="9edaf666-13f9-4f3e-a517-7a945576c5d7" name="build-order-accepted-response-flow" />
+		<flow-ref doc:name="Validate Order Request" doc:id="3cacb4a0-c5a7-48cd-847e-57225287f704" name="validate-order-request-flow" />
+		<flow-ref doc:name="Publish Order To Queue" doc:id="ce59b05d-269f-4eee-b093-bb3f986ee8ce" name="publish-order-to-queue-flow" />
+		<flow-ref doc:name="Build Order Accepted Response" doc:id="54acde96-25a2-442b-9207-97f525d5ceb4" name="build-order-accepted-response-flow" />
 	</flow>
-	<flow name="get:\employees\(id):p-order-processing-apiraml-config" doc:id="0e96d5d2-fc11-42bc-803f-7f71d74d98e3" >
-		<logger level="INFO" doc:name="Log Get Employee By ID Start" doc:id="92caa082-2e1c-43a6-9c26-9bc188441ad6" message="Get employee by ID request started" />
-		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Employee Id" doc:id="a7d711be-8f56-4615-861b-8e8312c78852" variableName="employeeId" />
-		<http:request method="GET" doc:name="Get Employee By Id From System API" doc:id="74fd4793-e01c-491d-82a7-989b732d2775" config-ref="employee-system-api-http-request-config" path="#['/api/employees/' ++ vars.employeeId]" />
-		<logger level="INFO" doc:name="Log Get Employee By ID End" doc:id="303b0654-5385-47e4-99b6-e2c61db99f91" message="Get employee by ID request completed" />
+	<flow name="get:\employees\(id):p-order-processing-apiraml-config" doc:id="9ac5889d-6d93-4cde-99ab-bca18525ac74" >
+		<logger level="INFO" doc:name="Log Get Employee By ID Start" doc:id="809737b2-1b85-4ae5-b559-d1f54b561044" message="Get employee by ID request started" />
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Employee Id" doc:id="861c7be1-9cff-42ae-9300-5e1722f27d5c" variableName="employeeId" />
+		<http:request method="GET" doc:name="Get Employee By Id From System API" doc:id="dfdb782c-ae5f-4246-8784-e21bebd3974a" config-ref="employee-system-api-http-request-config" path="#['/api/employees/' ++ vars.employeeId]" />
+		<logger level="INFO" doc:name="Log Get Employee By ID End" doc:id="54de8817-a799-4870-8656-82b76361efd8" message="Get employee by ID request completed" />
 	</flow>
 </mule>

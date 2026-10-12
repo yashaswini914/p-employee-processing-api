@@ -34,10 +34,14 @@ jobs:
       - name: Check Maven version
         run: mvn -version
 
-      - name: Restore secure properties file
+            - name: Restore secure properties file
         env:
           MULE_SECURE_YAML: ${{ secrets.MULE_SECURE_YAML }}
         run: |
+          if [ -z "$MULE_SECURE_YAML" ]; then
+            echo "MULE_SECURE_YAML secret is missing or unavailable"
+            exit 1
+          fi
           mkdir -p src/main/resources/properties
           printf '%s\n' "$MULE_SECURE_YAML" > src/main/resources/properties/secure.yaml
 

@@ -42,7 +42,7 @@ output application/json
     <!-- RABBITMQ ORDER LISTENER -->
     <flow name="order-processing-listener-flow">
         <amqp:listener doc:name="Consume Order From RabbitMQ" config-ref="AMQP_Config"
-                       queueName="${rabbitmq.orderQueue}" ackMode="AUTO" recoverStrategy="REQUEUE"/>
+                       queueName="${rabbitmq.orderQueue}" ackMode="AUTO" recoverStrategy="NO_REQUEUE"/>
         <logger level="INFO" doc:name="Log Order Message Received" message="Order message received from RabbitMQ queue"/>
         <set-variable doc:name="Parse RabbitMQ Order JSON" variableName="orderRequestPayload"
                       value='#[if (payload is Object) payload else read(payload, "application/json")]'/>
