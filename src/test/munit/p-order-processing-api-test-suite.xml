@@ -1,0 +1,731 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd&#10;http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd&#10;http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd&#10;http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd&#10;http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd&#10;http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd"><munit:config name="papi-all-tests-config"/>
+
+    <!-- ======================================= -->
+    <!-- 1. MAIN APIKIT ROUTER                  -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-main-router">
+        <munit:behavior>
+            <munit-tools:mock-when processor="apikit:router">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'OK'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="p-order-processing-apiraml-main"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 2. APIKIT CONSOLE                      -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-console">
+        <munit:behavior>
+            <munit-tools:mock-when processor="apikit:console">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="p-order-processing-apiraml-console"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 3. GET ALL EMPLOYEES                   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-get-all-employees">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- [{employeeId: 101, name: 'Alex'}]]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="get:\employees:p-order-processing-apiraml-config"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[sizeOf(payload)]" is="#[MunitTools::equalTo(1)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 4. GET EMPLOYEE BY ID                  -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-get-employee-by-id">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101, name: 'Alex'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:attributes value="#[{uriParams: {id: '101'}}]"/>
+            </munit:set-event>
+            <flow-ref name="get:\employees\(id):p-order-processing-apiraml-config"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.employeeId]" is="#[MunitTools::equalTo('101')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 5. POST NEW ORDER                      -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-post-new-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Employee In System API"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="HTTP:NOT_FOUND"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            <munit-tools:mock-when processor="jms:publish">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[null]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'New', data: [{employeeId: 101, name: 'Alex', address: 'Hyderabad', salary: 50000}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="post:\orders:application\json:p-order-processing-apiraml-config"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(202)]"/>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 6. POST UPDATE ORDER                   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-post-update-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            <munit-tools:mock-when processor="jms:publish">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[null]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Update', data: [{employeeId: 101, name: 'Alex', address: 'Warangal', salary: 60000}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="post:\orders:application\json:p-order-processing-apiraml-config"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(202)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 7. POST DELETE ORDER                   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-post-delete-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            <munit-tools:mock-when processor="jms:publish">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[null]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Delete', data: [{employeeId: 101}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="post:\orders:application\json:p-order-processing-apiraml-config"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(202)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 8. JMS LISTENER NEW                    -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-amqp-listener-new">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'New', data: [{employeeId: 101, name: 'Alex', address: 'Hyderabad', salary: 50000}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="order-processing-listener-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 9. PROCESS NEW ORDER                   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-process-new-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'New', data: [{employeeId: 101, name: 'Alex', address: 'Hyderabad', salary: 50000}]}]" mediaType="application/json"/>
+            <munit:variables><munit:variable key="orderRequestPayload" value="#[output application/json --- {operation: 'New', data: [{employeeId: 101, name: 'Alex', address: 'Hyderabad', salary: 50000}]}]"/></munit:variables></munit:set-event>
+            <flow-ref name="process-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 10. PROCESS UPDATE ORDER               -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-process-update-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Update', data: [{employeeId: 101, name: 'Alex', address: 'Warangal', salary: 60000}]}]" mediaType="application/json"/>
+            <munit:variables><munit:variable key="orderRequestPayload" value="#[output application/json --- {operation: 'Update', data: [{employeeId: 101, name: 'Alex', address: 'Warangal', salary: 60000}]}]"/></munit:variables></munit:set-event>
+            <flow-ref name="process-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 11. PROCESS DELETE ORDER               -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-process-delete-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Delete', data: [{employeeId: 101}]}]" mediaType="application/json"/>
+            <munit:variables><munit:variable key="orderRequestPayload" value="#[output application/json --- {operation: 'Delete', data: [{employeeId: 101}]}]"/></munit:variables></munit:set-event>
+            <flow-ref name="process-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 12. PROCESS INVALID OPERATION          -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-process-invalid-operation" expectedErrorType="ORDER:INVALID_OPERATION">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Other', data: [{employeeId: 101}]}]" mediaType="application/json"/>
+            <munit:variables><munit:variable key="orderRequestPayload" value="#[output application/json --- {operation: 'Other', data: [{employeeId: 101}]}]"/></munit:variables></munit:set-event>
+            <flow-ref name="process-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 13. CREATE EMPLOYEE IN SAPI            -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-create-employee-system-api">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'New', data: [{employeeId: 101, name: 'Alex', address: 'Hyderabad', salary: 50000}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="create-employee-in-system-api-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 14. UPDATE EMPLOYEE IN SAPI            -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-update-employee-system-api">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Update', data: [{employeeId: 101, name: 'Alex', address: 'Warangal', salary: 60000}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="update-employee-in-system-api-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 15. DELETE EMPLOYEE IN SAPI            -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-delete-employee-system-api">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {status: 'SUCCESS'}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'Delete', data: [{employeeId: 101}]}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="delete-employee-in-system-api-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 16. VALID ORDER                        -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-valid-order">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 17. INVALID OPERATION VALIDATION       -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-invalid-operation" expectedErrorType="VALIDATION:MULTIPLE">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'Invalid', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 18. MISSING DATA VALIDATION            -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-missing-order-data" expectedErrorType="VALIDATION:MULTIPLE">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: []}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-order-request-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 19. BUSINESS RULES NEW                 -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-business-rules-new">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 20. BUSINESS RULES UPDATE              -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-business-rules-update">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'Update', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 21. BUSINESS RULES DELETE              -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-business-rules-delete">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'Delete', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 22. PREQUEUE NEW EMPLOYEE              -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-prequeue-new-employee">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="HTTP:NOT_FOUND"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-before-queue-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.employeeExists]" is="#[MunitTools::equalTo(false)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 23. PREQUEUE DUPLICATE EMPLOYEE        -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-prequeue-duplicate-employee" expectedErrorType="EMPLOYEE:ALREADY_EXISTS">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[output application/json --- {employeeId: 101}]" mediaType="application/json"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-before-queue-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 24. PREQUEUE UPDATE EMPLOYEE MISSING   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-prequeue-update-not-found" expectedErrorType="EMPLOYEE:NOT_FOUND">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="HTTP:NOT_FOUND"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'Update', data: [{employeeId: 999}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-before-queue-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 25. PREQUEUE DELETE EMPLOYEE MISSING   -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-prequeue-delete-not-found" expectedErrorType="EMPLOYEE:NOT_FOUND">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="HTTP:NOT_FOUND"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'Delete', data: [{employeeId: 999}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-before-queue-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 26. PREQUEUE CONNECTIVITY FAILURE      -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-prequeue-connectivity">
+        <munit:behavior>
+            <munit-tools:mock-when processor="http:request">
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="HTTP:CONNECTIVITY"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="validate-business-rules-before-queue-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.employeeExistenceUnknown]" is="#[MunitTools::equalTo(true)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 27. PUBLISH ORDER TO JMS               -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-publish-order">
+        <munit:behavior>
+            <munit-tools:mock-when processor="jms:publish">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[null]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+                <munit:variables>
+                    <munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/>
+                </munit:variables>
+            </munit:set-event>
+            <flow-ref name="publish-order-to-queue-flow"/>
+        </munit:execution>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 28. BUILD ACCEPTED RESPONSE            -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-build-accepted-response">
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="build-order-accepted-response-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(202)]"/>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ======================================= -->
+    <!-- 29. DUPLICATE REJECTION TO DLQ         -->
+    <!-- ======================================= -->
+
+    <munit:test name="papi-duplicate-rejection">
+        <munit:behavior>
+            <munit-tools:mock-when processor="jms:publish">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[null]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        <munit:execution>
+            <munit:set-event>
+                <munit:payload value="#[output application/json --- {operation: 'New', rejection: {errorCode: 'EMP-409', employeeId: 101}}]" mediaType="application/json"/>
+            </munit:set-event>
+            <flow-ref name="receive-duplicate-rejection-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(202)]"/>
+            <munit-tools:assert-that expression="#[payload.status]" is="#[MunitTools::equalTo('SUCCESS')]"/>
+        </munit:validation>
+    </munit:test>
+    <munit:test name="papi-amqp-listener-processing-failure" expectedErrorType="MULE:EXPRESSION">
+
+    <munit:behavior>
+        <munit-tools:mock-when processor="flow-ref">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute attributeName="name" whereValue="process-order-request-flow"/>
+            </munit-tools:with-attributes>
+
+            <munit-tools:then-return>
+                <munit-tools:error typeId="MULE:EXPRESSION"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+    </munit:behavior>
+
+    <munit:execution>
+        <munit:set-event>
+            <munit:payload value="#[output application/json --- {operation: 'New', data: [{employeeId: 101}]}]" mediaType="application/json"/>
+        </munit:set-event>
+
+        <flow-ref name="order-processing-listener-flow"/>
+    </munit:execution>
+
+</munit:test>
+
+<munit:test name="papi-delete-validation-connectivity-failure" expectedErrorType="HTTP:CONNECTIVITY">
+
+    <munit:behavior>
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Employee Exists For Delete"/>
+            </munit-tools:with-attributes>
+
+            <munit-tools:then-return>
+                <munit-tools:error typeId="HTTP:CONNECTIVITY"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+    </munit:behavior>
+
+    <munit:execution>
+        <munit:set-event>
+            <munit:payload value="#[{}]"/>
+            <munit:variables>
+                <munit:variable key="orderRequestPayload" value="#[{operation: 'Delete', data: [{employeeId: 101}]}]"/>
+            </munit:variables>
+        </munit:set-event>
+
+        <flow-ref name="validate-business-rules-flow"/>
+    </munit:execution>
+
+</munit:test>
+<munit:test name="papi-update-validation-connectivity-failure" expectedErrorType="HTTP:CONNECTIVITY">
+
+    <munit:behavior>
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Employee Exists For Update"/>
+            </munit-tools:with-attributes>
+
+            <munit-tools:then-return>
+                <munit-tools:error typeId="HTTP:CONNECTIVITY"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+    </munit:behavior>
+
+    <munit:execution>
+        <munit:set-event>
+            <munit:payload value="#[{}]"/>
+            <munit:variables>
+                <munit:variable key="orderRequestPayload" value="#[{operation: 'Update', data: [{employeeId: 101}]}]"/>
+            </munit:variables>
+        </munit:set-event>
+
+        <flow-ref name="validate-business-rules-flow"/>
+    </munit:execution>
+
+</munit:test>
+
+<munit:test name="papi-amqp-listener-object-payload">
+ <munit:behavior><munit-tools:mock-when processor="flow-ref"><munit-tools:with-attributes><munit-tools:with-attribute attributeName="name" whereValue="process-order-request-flow"/></munit-tools:with-attributes><munit-tools:then-return><munit-tools:payload value="#[{}]"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{operation: 'New', data: [{employeeId: 101}]}]"/></munit:set-event><flow-ref name="order-processing-listener-flow"/></munit:execution>
+ <munit:validation><munit-tools:assert-that expression="#[vars.orderRequestPayload.operation]" is="#[MunitTools::equalTo('New')]"/></munit:validation>
+</munit:test>
+<munit:test name="papi-prequeue-update-exists">
+ <munit:behavior><munit-tools:mock-when processor="http:request"><munit-tools:then-return><munit-tools:payload value="#[{employeeId: 101}]"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{}]"/><munit:variables><munit:variable key="orderRequestPayload" value="#[{operation: 'Update', data: [{employeeId: 101}]}]"/></munit:variables></munit:set-event><flow-ref name="validate-business-rules-before-queue-flow"/></munit:execution>
+ <munit:validation><munit-tools:assert-that expression="#[vars.employeeExists]" is="#[MunitTools::equalTo(true)]"/></munit:validation>
+</munit:test>
+<munit:test name="papi-prequeue-delete-exists">
+ <munit:behavior><munit-tools:mock-when processor="http:request"><munit-tools:then-return><munit-tools:payload value="#[{employeeId: 101}]"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{}]"/><munit:variables><munit:variable key="orderRequestPayload" value="#[{operation: 'Delete', data: [{employeeId: 101}]}]"/></munit:variables></munit:set-event><flow-ref name="validate-business-rules-before-queue-flow"/></munit:execution>
+ <munit:validation><munit-tools:assert-that expression="#[vars.employeeExists]" is="#[MunitTools::equalTo(true)]"/></munit:validation>
+</munit:test>
+<munit:test name="papi-prequeue-new-system-unavailable">
+ <munit:behavior><munit-tools:mock-when processor="http:request"><munit-tools:then-return><munit-tools:error typeId="HTTP:TIMEOUT"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{}]"/><munit:variables><munit:variable key="orderRequestPayload" value="#[{operation: 'New', data: [{employeeId: 101}]}]"/></munit:variables></munit:set-event><flow-ref name="validate-business-rules-before-queue-flow"/></munit:execution>
+ <munit:validation><munit-tools:assert-that expression="#[vars.employeeExistenceUnknown]" is="#[MunitTools::equalTo(true)]"/></munit:validation>
+</munit:test>
+<munit:test name="papi-business-rules-delete-not-found" expectedErrorType="HTTP:NOT_FOUND">
+ <munit:behavior><munit-tools:mock-when processor="http:request"><munit-tools:then-return><munit-tools:error typeId="HTTP:NOT_FOUND"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{}]"/><munit:variables><munit:variable key="orderRequestPayload" value="#[{operation: 'Delete', data: [{employeeId: 999}]}]"/></munit:variables></munit:set-event><flow-ref name="validate-business-rules-flow"/></munit:execution>
+</munit:test>
+<munit:test name="papi-business-rules-update-not-found" expectedErrorType="HTTP:NOT_FOUND">
+ <munit:behavior><munit-tools:mock-when processor="http:request"><munit-tools:then-return><munit-tools:error typeId="HTTP:NOT_FOUND"/></munit-tools:then-return></munit-tools:mock-when></munit:behavior>
+ <munit:execution><munit:set-event><munit:payload value="#[{}]"/><munit:variables><munit:variable key="orderRequestPayload" value="#[{operation: 'Update', data: [{employeeId: 999}]}]"/></munit:variables></munit:set-event><flow-ref name="validate-business-rules-flow"/></munit:execution>
+</munit:test>
+</mule>

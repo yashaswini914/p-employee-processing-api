@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+          http://www.mulesoft.org/schema/mule/core
+          http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+          http://www.mulesoft.org/schema/mule/ee/core
+          http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <error-handler name="PAPI_Global_Error_Handler">
+
+        <!-- VALIDATION ERRORS -->
+
+        <on-error-propagate
+            doc:name="Handle Validation Errors"
+            type="VALIDATION:*">
+
+            <set-variable
+    doc:name="Set HTTP Status Code 400"
+    variableName="httpStatus"
+    value="400"/>
+
+            <ee:transform doc:name="Build Validation Error Respons">
+                <ee:message>
+                    <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-400",
+    message: error.description,
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+        </on-error-propagate>
+
+
+        <!-- RESOURCE NOT FOUND -->
+
+        <on-error-propagate
+            doc:name="Handle Resource Not Found"
+            type="APIKIT:NOT_FOUND">
+
+            <set-variable
+                doc:name="Set HTTP Status Code 404"
+                variableName="httpStatus"
+                value="404"/>
+
+            <ee:transform doc:name="Build Resource Not Found Error Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-404",
+    message: "Resource not found",
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+        </on-error-propagate>
+       <on-error-propagate
+    doc:name="Handle Employee Not Found"
+    type="HTTP:NOT_FOUND">
+
+    <set-variable
+        doc:name="Set HTTP Status Code 404"
+        variableName="httpStatus"
+        value="404"/>
+
+    <ee:transform doc:name="Build Employee Not Found Response">
+        <ee:message>
+            <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-404",
+    message: "Employee not found",
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+        </ee:message>
+    </ee:transform>
+
+</on-error-propagate>
+
+        <on-error-propagate
+            doc:name="Handle Connectivity Errors"
+            type="HTTP:CONNECTIVITY">
+
+            <set-variable
+                doc:name="Set HTTP Status Code"
+                variableName="httpStatus"
+                value="503"/>
+
+            <ee:transform doc:name="Build System API Connectivity Error Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-503",
+    message: "Employee System API unavailable",
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+        </on-error-propagate>
+
+
+        <!-- APIKIT ERRORS -->
+
+        <on-error-propagate
+            doc:name="Handle APIKit Errors"
+            type="APIKIT:*">
+
+            <set-variable
+                doc:name="Set HTTP Status Code"
+                variableName="httpStatus"
+                value="400"/>
+
+            <ee:transform doc:name="Build APIKit Error Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-400",
+    message: error.description default "Bad Request",
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+        </on-error-propagate>
+        <on-error-propagate
+    type="EMPLOYEE:ALREADY_EXISTS"
+    doc:name="Handle Employee Already Exists">
+
+    <set-variable
+        variableName="httpStatus"
+        value="#[409]"/>
+
+    <ee:transform doc:name="Build Employee Already Exists Response">
+        <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-409",
+    message: error.description,
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}]]></ee:set-payload>
+        </ee:message>
+    </ee:transform>
+
+</on-error-propagate>
+
+<on-error-propagate
+    type="EMPLOYEE:NOT_FOUND"
+    doc:name="Handle Employee Not Found">
+
+    <set-variable
+        variableName="httpStatus"
+        value="#[404]"/>
+
+    <ee:transform doc:name="Build Employee Not Found Response">
+        <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-404",
+    message: error.description,
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}]]></ee:set-payload>
+        </ee:message>
+    </ee:transform>
+
+</on-error-propagate>
+        
+
+
+        <!-- ALL OTHER ERRORS -->
+
+        <on-error-propagate
+            doc:name="Handle Unexpected Errors"
+            type="ANY">
+
+            <set-variable
+                doc:name="Set HTTP Status Code"
+                variableName="httpStatus"
+                value="500"/>
+
+            <ee:transform doc:name="Build Internal Server Error Response">
+                <ee:message>
+                    <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    status: "ERROR",
+    errorCode: "ORD-500",
+    message: "Internal server error",
+    correlationId: correlationId,
+    timestamp: now() as String,
+    apiName: "p-order-processing-api"
+}
+]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+
+        </on-error-propagate>
+
+    </error-handler>
+    
+
+
+
+</mule>

@@ -1,0 +1,17 @@
+rabbitmq:
+  host: "puffin.rmq2.cloudamqp.com"
+  port: "5672"
+  virtualHost: "pqfiiufh"
+  username: "pqfiiufh"
+
+  orderExchange: "order.exchange"
+  
+  orderQueue: "order-queue"
+  orderRoutingKey: "order.process"
+
+  deadLetterExchange: "order.dlx"
+  deadLetterQueue: "order-dlq"
+  deadLetterRoutingKey: "order.failed"
+
+app:
+  name: "p-order-processing-api"

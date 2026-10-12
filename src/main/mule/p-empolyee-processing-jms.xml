@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+      http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+      http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+      http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+      http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+
+    <!-- ORDER ACCEPTED RESPONSE -->
+    <sub-flow name="build-order-accepted-response-flow">
+        <set-variable variableName="httpStatus" value="#[202]" doc:name="Set Accepted Status Code"/>
+        <ee:transform doc:name="Build Order Accepted Success Response">
+            <ee:message><ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ status: "SUCCESS", message: "Order accepted for processing" }]]></ee:set-payload></ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Log Order Request Completion" message="Order accepted for processing"/>
+    </sub-flow>
+
+    <!-- PUBLISH ORDER TO RABBITMQ -->
+    <sub-flow name="publish-order-to-queue-flow">
+        <logger level="INFO" doc:name="Log Order Queue Publishing Start" message="Publishing order request to RabbitMQ exchange"/>
+        <amqp:publish doc:name="Publish Order To RabbitMQ" config-ref="AMQP_Config"
+                      exchangeName="${rabbitmq.orderExchange}"
+                      routingKeys="#[[p('rabbitmq.orderRoutingKey')]]"
+                      deliveryMode="PERSISTENT" mandatory="true">
+            <amqp:message>
+                <amqp:body><![CDATA[#[write(vars.orderRequestPayload, "application/json")]]]></amqp:body>
+            </amqp:message>
+        </amqp:publish>
+        <logger level="INFO" doc:name="Log Order Submission Success" message="Order request published to RabbitMQ"/>
+    </sub-flow>
+
+    <!-- RABBITMQ ORDER LISTENER -->
+    <flow name="order-processing-listener-flow">
+        <amqp:listener doc:name="Consume Order From RabbitMQ" config-ref="AMQP_Config"
+                       queueName="${rabbitmq.orderQueue}" ackMode="AUTO" recoverStrategy="REQUEUE"/>
+        <logger level="INFO" doc:name="Log Order Message Received" message="Order message received from RabbitMQ queue"/>
+        <set-variable doc:name="Parse RabbitMQ Order JSON" variableName="orderRequestPayload"
+                      value='#[if (payload is Object) payload else read(payload, "application/json")]'/>
+        <flow-ref doc:name="Process Order Request" name="process-order-request-flow"/>
+        <logger level="INFO" doc:name="Log Order Processing Completion" message="Order processing completed"/>
+        <error-handler>
+            <on-error-propagate enableNotifications="true" logException="true" doc:name="Handle Order Processing Failure">
+                <logger level="ERROR" doc:name="Log Order Processing Failure"
+                        message="Order processing failed; RabbitMQ message will be requeued for redelivery"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- PROCESS ORDER OPERATION -->
+    <sub-flow name="process-order-request-flow">
+        <logger level="INFO" doc:name="Log Process Order Start" message="Order operation processing started"/>
+        <!-- Do not overwrite parsed orderRequestPayload with the raw AMQP body. -->
+        <set-payload doc:name="Restore Parsed Order Payload" value="#[vars.orderRequestPayload]"/>
+        <flow-ref doc:name="Validate Business Rules" name="validate-business-rules-flow"/>
+        <set-payload doc:name="Restore Original Order Payload" value="#[vars.orderRequestPayload]"/>
+        <choice doc:name="Route Order Operation">
+            <when expression="#[payload.operation == 'New']">
+                <flow-ref doc:name="Create Employee In System API" name="create-employee-in-system-api-flow"/>
+            </when>
+            <when expression="#[payload.operation == 'Update']">
+                <flow-ref doc:name="Update Employee In System API" name="update-employee-in-system-api-flow"/>
+            </when>
+            <when expression="#[payload.operation == 'Delete']">
+                <flow-ref doc:name="Delete Employee In System API" name="delete-employee-in-system-api-flow"/>
+            </when>
+            <otherwise>
+                <raise-error doc:name="Raise Invalid Operation Error" type="ORDER:INVALID_OPERATION"
+                             description="Operation must be New, Update or Delete"/>
+            </otherwise>
+        </choice>
+        <logger level="INFO" doc:name="Log Process Order End" message="Order operation processing completed"/>
+    </sub-flow>
+
+    <!-- CREATE EMPLOYEE IN SAPI -->
+    <sub-flow name="create-employee-in-system-api-flow">
+        <logger level="INFO" doc:name="Log Employee Creation Start" message="Create employee System API request started"/>
+        <ee:transform doc:name="Transform Order Payload To Employee Create Request">
+            <ee:message><ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    employeeId: payload.data[0].employeeId,
+    name: payload.data[0].name,
+    address: payload.data[0].address,
+    salary: payload.data[0].salary
+}]]></ee:set-payload></ee:message>
+        </ee:transform>
+        <http:request method="POST" doc:name="Create Employee In System API"
+                      config-ref="employee-system-api-http-request-config" path="/api/employees"/>
+        <logger level="INFO" doc:name="Log Employee Creation Response" message="Employee creation response received from System API"/>
+    </sub-flow>
+
+    <!-- UPDATE EMPLOYEE IN SAPI -->
+    <sub-flow name="update-employee-in-system-api-flow">
+        <logger level="INFO" doc:name="Log Employee Update Start" message="Update employee System API request started"/>
+        <set-variable variableName="employeeId" value="#[payload.data[0].employeeId]" doc:name="Set Employee Id"/>
+        <ee:transform doc:name="Transform Order Payload To Employee Update Request">
+            <ee:message><ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    employeeId: payload.data[0].employeeId,
+    name: payload.data[0].name,
+    address: payload.data[0].address,
+    salary: payload.data[0].salary
+}]]></ee:set-payload></ee:message>
+        </ee:transform>
+        <http:request config-ref="employee-system-api-http-request-config" method="PUT"
+                      path="#[ '/api/employees/' ++ (vars.employeeId as String) ]" doc:name="Update Employee In System API"/>
+        <logger level="INFO" doc:name="Log Employee Update Response" message="Employee update response received from System API"/>
+    </sub-flow>
+
+    <!-- DELETE EMPLOYEE IN SAPI -->
+    <sub-flow name="delete-employee-in-system-api-flow">
+        <logger level="INFO" doc:name="Log Employee Delete Start" message="Delete employee System API request started"/>
+        <set-variable variableName="employeeId" value="#[payload.data[0].employeeId]" doc:name="Set Employee Id"/>
+        <http:request config-ref="employee-system-api-http-request-config" method="DELETE"
+                      path="#[ '/api/employees/' ++ (vars.employeeId as String) ]" doc:name="Delete Employee In System API"/>
+        <logger level="INFO" doc:name="Log Employee Delete Response" message="Employee delete response received from System API"/>
+    </sub-flow>
+
+    <!-- VALIDATE ORDER REQUEST -->
+    <sub-flow name="validate-order-request-flow">
+        <logger level="INFO" doc:name="Log Order Validation Start" message="Order request validation started"/>
+        <validation:all doc:name="Validate Required Order Fields">
+            <validation:is-not-null config-ref="Validation_Config" value="#[vars.orderRequestPayload.operation]"
+                                    message="Operation is mandatory" doc:name="Validate Order Operation"/>
+            <validation:is-true config-ref="Validation_Config"
+                                expression="#[['New','Update','Delete'] contains vars.orderRequestPayload.operation]"
+                                message="Operation must be New, Update or Delete" doc:name="Validate Order Operation Type"/>
+            <validation:is-true config-ref="Validation_Config"
+                                expression="#[!isEmpty(vars.orderRequestPayload.data)]"
+                                message="Data is mandatory" doc:name="Validate Order Data"/>
+        </validation:all>
+        <logger level="INFO" doc:name="Log Order Validation End" message="Order request validation completed"/>
+    </sub-flow>
+
+    <!-- VALIDATE BUSINESS RULES -->
+    <sub-flow name="validate-business-rules-flow">
+        <logger level="INFO" doc:name="Log Business Rule Validation Start" message="Business rule validation started"/>
+        <choice doc:name="Validate Business Rules">
+            <when expression="#[vars.orderRequestPayload.operation == 'Delete']">
+                <try doc:name="Validate Employee Exists For Delete">
+                    <set-variable doc:name="Set Employee Id" variableName="employeeId"
+                                  value="#[vars.orderRequestPayload.data[0].employeeId]"/>
+                    <http:request doc:name="Check Employee Exists For Delete"
+                                  config-ref="employee-system-api-http-request-config" method="GET"
+                                  path="#[ '/api/employees/' ++ (vars.employeeId as String) ]"/>
+                    <error-handler>
+                        <on-error-propagate type="HTTP:NOT_FOUND" doc:name="Propagate Employee Not Found For Delete"/>
+                        <on-error-propagate type="HTTP:CONNECTIVITY" logException="true" enableNotifications="true">
+                            <logger level="ERROR" message="SAPI connectivity failure during validation; RabbitMQ message rejected for DLQ handling."/>
+                        </on-error-propagate>
+                    </error-handler>
+                </try>
+            </when>
+            <when expression="#[vars.orderRequestPayload.operation == 'Update']">
+                <try doc:name="Validate Employee Exists For Update">
+                    <set-variable doc:name="Set Employee Id" variableName="employeeId"
+                                  value="#[vars.orderRequestPayload.data[0].employeeId]"/>
+                    <http:request doc:name="Check Employee Exists For Update"
+                                  config-ref="employee-system-api-http-request-config" method="GET"
+                                  path="#[ '/api/employees/' ++ (vars.employeeId as String) ]"/>
+                    <error-handler>
+                        <on-error-propagate type="HTTP:NOT_FOUND" doc:name="Propagate Employee Not Found For Update"/>
+                        <on-error-propagate type="HTTP:CONNECTIVITY" logException="true" enableNotifications="true">
+                            <logger level="ERROR" message="SAPI connectivity failure during validation; RabbitMQ message rejected for DLQ handling."/>
+                        </on-error-propagate>
+                    </error-handler>
+                </try>
+            </when>
+        </choice>
+        <logger level="INFO" doc:name="Log Business Rule Validation End" message="Business rule validation completed"/>
+    </sub-flow>
+
+    <!-- RECEIVE DUPLICATE REJECTION -->
+    <flow name="receive-duplicate-rejection-flow">
+        <http:listener doc:name="Receive Duplicate Rejection"
+                       config-ref="p-order-processing-apiraml-httpListenerConfig"
+                       path="/internal/rejections" allowedMethods="POST">
+            <http:response statusCode="#[vars.httpStatus default 202]"/>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+            </http:error-response>
+        </http:listener>
+        <set-variable doc:name="Store Duplicate Rejection" variableName="duplicateRejection" value="#[payload]"/>
+        <amqp:publish doc:name="Publish Duplicate Rejection To RabbitMQ DLQ" config-ref="AMQP_Config"
+                      exchangeName="${rabbitmq.deadLetterExchange}"
+                      routingKeys="#[[p('rabbitmq.deadLetterRoutingKey')]]"
+                      deliveryMode="PERSISTENT" mandatory="true">
+            <amqp:message>
+                <amqp:body><![CDATA[#[write(vars.duplicateRejection, "application/json")]]]></amqp:body>
+            </amqp:message>
+        </amqp:publish>
+        <set-variable doc:name="Set HTTP Status 202" variableName="httpStatus" value="#[202]"/>
+        <ee:transform doc:name="Build Rejection Accepted Response">
+            <ee:message><ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ status: "SUCCESS", message: "Duplicate rejection published to DLQ" }]]></ee:set-payload></ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- VALIDATE BUSINESS RULES BEFORE QUEUE -->
+    <sub-flow name="validate-business-rules-before-queue-flow">
+        <set-variable variableName="employeeId"
+                      value="#[vars.orderRequestPayload.data[0].employeeId as String]" doc:name="Store Employee ID"/>
+        <set-variable variableName="employeeExists" value="#[false]" doc:name="Initialize Employee Exists"/>
+        <set-variable variableName="employeeExistenceUnknown" value="#[false]" doc:name="Initialize Employee Existence Unknown"/>
+        <try doc:name="Check Employee Existence Before Queue">
+            <http:request method="GET" config-ref="employee-system-api-http-request-config"
+                          path="#[ '/api/employees/' ++ vars.employeeId ]" doc:name="Check Employee In System API"/>
+            <set-variable variableName="employeeExists" value="#[true]" doc:name="Employee Exists"/>
+            <error-handler>
+                <on-error-continue type="HTTP:NOT_FOUND" doc:name="Employee Does Not Exist">
+                    <set-variable variableName="employeeExists" value="#[false]"/>
+                </on-error-continue>
+                <on-error-continue type="HTTP:CONNECTIVITY, HTTP:TIMEOUT, HTTP:SERVICE_UNAVAILABLE"
+                                   doc:name="Allow Queueing When Database Unavailable">
+                    <set-variable variableName="employeeExistenceUnknown" value="#[true]"/>
+                    <logger level="WARN" message="Employee existence check unavailable. Order will be queued for later processing."/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+        <choice doc:name="Apply Business Validation">
+            <when expression="#[vars.orderRequestPayload.operation == 'New' and vars.employeeExists and not vars.employeeExistenceUnknown]">
+                <raise-error type="EMPLOYEE:ALREADY_EXISTS"
+                             description="#[ 'Employee with ID ' ++ vars.employeeId ++ ' already exists' ]"/>
+            </when>
+            <when expression="#[ (vars.orderRequestPayload.operation == 'Update' or vars.orderRequestPayload.operation == 'Delete') and not vars.employeeExists and not vars.employeeExistenceUnknown ]">
+                <raise-error type="EMPLOYEE:NOT_FOUND"
+                             description="#[ 'Employee with ID ' ++ vars.employeeId ++ ' not found' ]"/>
+            </when>
+        </choice>
+        <logger level="INFO" message="Pre-queue business validation completed"/>
+    </sub-flow>
+</mule>
